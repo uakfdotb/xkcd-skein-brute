@@ -1,5 +1,10 @@
 Brute-forcer for http://almamater.xkcd.com/
 
+To run:
+	make
+	./screen-nice-wrapper.sh
+	(executing main directly will not automatically submit solutions)
+
 The problem is basically hashing large swaths of key space to find
 near-collisions with a given bitstring. The better the 'near-ness', the higher
 your rank. It is computed by taking the bitwise distance from the hash of the
