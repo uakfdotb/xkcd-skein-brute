@@ -118,7 +118,7 @@ ascii_incr_char(char *c)
 inline void
 ascii_incr(char *str)
 {
-	char *eos = str + LENGTH;
+	char *eos = str + LENGTH - 1;
 
 	while (eos >= str) {
 		if(ascii_incr_char(eos))
