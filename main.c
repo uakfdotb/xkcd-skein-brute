@@ -240,6 +240,7 @@ make_hash_sexy_time(void *v)
 				printf("Found '%s' with distance %u\n", string,
 				    hdist);
 				fflush(stdout);
+				dump_hex(string, 128);
 			}
 		}
 
@@ -261,7 +262,12 @@ main(void)
 	pthread_attr_t pdetached;
 	pthread_t thr;
 	bool overflow;
-	char initvalue[5] = "A";
+	char initvalue[64];
+	srand(time(NULL));
+	
+	for(int i = 0; i < 62; i++) {
+		initvalue[i] = rand() % 256;
+	}
 
 	read_hex(target, target_bytes);
 
