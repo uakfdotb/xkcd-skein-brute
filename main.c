@@ -10,12 +10,15 @@
 #include <sys/queue.h>
 
 #include "skein.h"
-#include "skein_block.c"
+#if 1
+# define SKEIN_UNROLL_1024 10
+# include "skein_block.c"
+#endif
 #include "skein.c"
 
 #define NTHREADS 16
 
-void __attribute__((always_inline))
+inline void
 ASSERT(intptr_t i)
 {
 
@@ -264,16 +267,26 @@ make_hash_sexy_time(void *v)
 int
 main(void)
 {
-	int r, len = 1;
+	int r, len = 118;
 	pthread_attr_t pdetached;
 	pthread_t thr;
 	bool overflow;
 	char initvalue[120];
-	srand(time(NULL));
+	
+	//seed the RNG
+	FILE *input = fopen("/dev/urandom", "rb");
+	unsigned int seed;
+	fread(&seed, sizeof(seed), 1, input);
+	fclose(input);
+	
+	srand(seed);
 	
 	for(int i = 0; i < 118; i++) {
 		initvalue[i] = rand() % 24 + ((rand() % 2) ? 65 : 97);
 	}
+	
+	initvalue[118] = 0;
+	initvalue[119] = 0;
 
 	read_hex(target, target_bytes);
 
