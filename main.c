@@ -17,14 +17,7 @@
 #include "skein.c"
 
 #define NTHREADS 16
-
-inline void
-ASSERT(intptr_t i)
-{
-
-	if (!i)
-		abort();
-}
+#define LENGTH 120
 
 const char *target =
 "5b4da95f5fa08280fc9879df44f418c8f9f12ba424b7757de02bbdfbae0d4c4fdf9317c80cc5fe04c6429073466cf29706b8c25999ddd2f6540d4475cc977b87f4757be023f19b8f4035d7722886b78869826de916a79cf9c94cc79cd4347d24b567aa3e2390a573a373a48a5e676640c79cc70197e1c5e7f902fb53ca1858b6";
@@ -47,8 +40,6 @@ read_hex(const char *hs, uint8_t *out)
 {
 	size_t slen = strlen(hs);
 
-	ASSERT(slen % 8 == 0);
-
 	for (unsigned i = 0; i < slen; i += 2) {
 		uint32_t x;
 		sscanf(hs, "%08x", &x);
@@ -64,25 +55,19 @@ read_hex(const char *hs, uint8_t *out)
 inline void
 plock(pthread_mutex_t *l)
 {
-	int r;
-	r = pthread_mutex_lock(l);
-	ASSERT(r == 0);
+	pthread_mutex_lock(l);
 }
 
 inline void
 punlock(pthread_mutex_t *l)
 {
-	int r;
-	r = pthread_mutex_unlock(l);
-	ASSERT(r == 0);
+	pthread_mutex_unlock(l);
 }
 
 inline void
 condwait(pthread_cond_t *c, pthread_mutex_t *l)
 {
-	int r;
-	r = pthread_cond_wait(c, l);
-	ASSERT(r == 0);
+	pthread_cond_wait(c, l);
 }
 
 inline void *
@@ -90,7 +75,6 @@ xmalloc(size_t z)
 {
 	void *r;
 	r = malloc(z);
-	ASSERT(r != NULL);
 	return r;
 }
 
@@ -99,16 +83,13 @@ xstrdup(const char *s)
 {
 	char *r;
 	r = strdup(s);
-	ASSERT(r != NULL);
 	return r;
 }
 
 inline void
 wakeup(pthread_cond_t  *c)
 {
-	int r;
-	r = pthread_cond_broadcast(c);
-	ASSERT(r == 0);
+	pthread_cond_broadcast(c);
 }
 
 struct prefix_work {
@@ -116,39 +97,32 @@ struct prefix_work {
 	char *prefix;
 };
 
-inline void
-ascii_incr_char(char *c, bool *carry_inout)
+inline bool
+ascii_incr_char(char *c)
 {
-	if (*carry_inout) {
-		if (*c != 'z') {
-			if (*c != 'Z') {
-				if (*c != '9')
-					*c += 1;
-				else
-					*c = 'A';
-			} else
-				*c = 'a';
-			*carry_inout = false;
+	if (*c != 'z') {
+		if (*c != 'Z') {
+			if (*c != '9')
+				*c += 1;
+			else
+				*c = 'A';
 		} else
-			*c = '0';
-	}
+			*c = 'a';
+		return true;
+	} else
+		*c = '0';
+	
+	return false;
 }
 
-inline bool
+inline void
 ascii_incr(char *str)
 {
-	char *eos = str + strlen(str) - 1;
-	bool carry = true;
+	char *eos = str + LENGTH;
 
-	while (true) {
-		ascii_incr_char(eos, &carry);
-
-		if (eos == str && carry)
-			return true;
-
-		if (!carry)
-			return false;
-
+	while (eos >= str) {
+		if(ascii_incr_char(eos))
+			return;
 		eos--;
 	}
 }
@@ -159,8 +133,6 @@ xor_dist(uint8_t *a8, uint8_t *b8, size_t len)
 	unsigned tot = 0;
 	uint64_t *a = (void*)a8,
 		 *b = (void*)b8;
-
-	ASSERT(len % (sizeof *a) == 0);
 
 	while (len > 0) {
 		tot += __builtin_popcountll(*a ^ *b);
@@ -173,22 +145,14 @@ xor_dist(uint8_t *a8, uint8_t *b8, size_t len)
 }
 
 inline unsigned
-hash_dist(const char *trial, size_t len, uint8_t *hash)
+hash_dist(const char *trial, size_t len, uint8_t *hash, uint8_t trhash[1024/8])
 {
-	uint8_t trhash[1024/8];
 	Skein1024_Ctxt_t c;
-	int r;
 
-	r = Skein1024_Init(&c, 1024);
-	ASSERT(r == SKEIN_SUCCESS);
-
-	r = Skein1024_Update(&c, (void*)trial, len);
-	ASSERT(r == SKEIN_SUCCESS);
-
-	r = Skein1024_Final(&c, trhash);
-	ASSERT(r == SKEIN_SUCCESS);
-
-	return xor_dist(trhash, hash, sizeof trhash);
+	Skein1024_Init(&c, 1024);
+	Skein1024_Update(&c, (void*)trial, len);
+	Skein1024_Final(&c, trhash);
+	return xor_dist(trhash, hash, 1024/8);
 }
 
 unsigned rbestdist = 2000;
@@ -198,22 +162,20 @@ pthread_mutex_t rlock = PTHREAD_MUTEX_INITIALIZER;
 void *
 make_hash_sexy_time(void *v)
 {
-	char string[256] = { 0 },
-	     *initstr = v;
+	char string[256] = { 0 };
 	uint8_t loc_target_hash[1024/8];
-	size_t str_len;
+	uint8_t trhash[1024/8];
 	unsigned last_best = 4000;
-	bool overflow;
-	unsigned len = strlen(initstr);
+	
+	for(int i = 0; i < LENGTH; i++) {
+		string[i] = rand() % 24 + ((rand() % 2) ? 65 : 97);
+	}
 
 	memcpy(loc_target_hash, target_bytes, sizeof(target_bytes));
 
-	strcpy(string, initstr);
-	free(initstr);
-
-	str_len = strlen(string);
 	while (true) {
-		unsigned hdist = hash_dist(string, str_len, loc_target_hash);
+		unsigned hdist = hash_dist(string, LENGTH, loc_target_hash, trhash);
+
 		if (hdist < last_best) {
 			bool improved = false;
 
@@ -233,25 +195,15 @@ make_hash_sexy_time(void *v)
 			}
 		}
 
-		for (unsigned i = 0; i < NTHREADS; i++) {
-			overflow = ascii_incr(string);
-			if (overflow) {
-				len++;
-				memset(string, 'A', len);
-				str_len = strlen(string);
-			}
-		}
+		ascii_incr(string);
 	}
 }
 
 int
 main(void)
 {
-	int r, len = 118;
 	pthread_attr_t pdetached;
 	pthread_t thr;
-	bool overflow;
-	char initvalue[120];
 	
 	//seed the RNG
 	FILE *input = fopen("/dev/urandom", "rb");
@@ -260,31 +212,15 @@ main(void)
 	fclose(input);
 	
 	srand(seed);
-	
-	for(int i = 0; i < 118; i++) {
-		initvalue[i] = rand() % 24 + ((rand() % 2) ? 65 : 97);
-	}
-	
-	initvalue[118] = 0;
-	initvalue[119] = 0;
 
 	read_hex(target, target_bytes);
 
-	r = pthread_attr_init(&pdetached);
-	ASSERT(r == 0);
-	r = pthread_attr_setdetachstate(&pdetached, PTHREAD_CREATE_DETACHED);
-	ASSERT(r == 0);
+	pthread_attr_init(&pdetached);
+	pthread_attr_setdetachstate(&pdetached, PTHREAD_CREATE_DETACHED);
 
 	for (unsigned i = 0; i < NTHREADS; i++) {
-		r = pthread_create(&thr, &pdetached, make_hash_sexy_time,
-		    xstrdup(initvalue));
-		ASSERT(r == 0);
-
-		overflow = ascii_incr(initvalue);
-		if (overflow) {
-			len++;
-			memset(initvalue, 'A', len);
-		}
+		pthread_create(&thr, &pdetached, make_hash_sexy_time,
+		    NULL);
 	}
 
 	while (true)
