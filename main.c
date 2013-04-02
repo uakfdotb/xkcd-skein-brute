@@ -30,6 +30,24 @@ const char *target =
 "5b4da95f5fa08280fc9879df44f418c8f9f12ba424b7757de02bbdfbae0d4c4fdf9317c80cc5fe04c6429073466cf29706b8c25999ddd2f6540d4475cc977b87f4757be023f19b8f4035d7722886b78869826de916a79cf9c94cc79cd4347d24b567aa3e2390a573a373a48a5e676640c79cc70197e1c5e7f902fb53ca1858b6";
 uint8_t target_bytes[1024/8];
 
+int count = 0;
+
+void
+dump_hex(void *v, size_t sz)
+{
+	uint32_t *u32 = v;
+
+	ASSERT(sz % sizeof(*u32) == 0);
+
+	for (; sz > 0; sz -= sizeof *u32) {
+		printf("%08x", be32toh(*u32));
+		u32++;
+	}
+
+	printf("\n");
+	fflush(stdout);
+}
+
 uint8_t
 nibble(char c)
 {
@@ -237,6 +255,11 @@ make_hash_sexy_time(void *v)
 				memset(string, 'A', len);
 				str_len = strlen(string);
 			}
+      
+      count++;
+      if (count % 100000==0) {
+        //printf("%d\n", count);
+      }
 		}
 	}
 }
