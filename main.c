@@ -6,15 +6,31 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <sys/queue.h>
 
-#include "skein.h"
-#if 1
-# define SKEIN_UNROLL_1024 10
-# include "skein_block.c"
-#endif
-#include "skein.c"
+#include "SHA3api_ref.h"
+
+const unsigned char BitsSetTable256[256] = 
+{
+#   define B2(n) n,     n+1,     n+1,     n+2
+#   define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
+#   define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
+    B6(0), B6(1), B6(1), B6(2)
+};
+
+inline int count(uint64_t num){
+	unsigned char * p = (unsigned char *) &num;
+	return BitsSetTable256[p[0]] +
+		BitsSetTable256[p[1]] +
+		BitsSetTable256[p[2]] +
+		BitsSetTable256[p[3]] +
+		BitsSetTable256[p[4]] +
+		BitsSetTable256[p[5]] +
+		BitsSetTable256[p[6]] +
+		BitsSetTable256[p[7]];
+}
 
 #define NTHREADS 16
 #define LENGTH 120
@@ -135,7 +151,7 @@ xor_dist(uint8_t *a8, uint8_t *b8, size_t len)
 		 *b = (void*)b8;
 
 	while (len > 0) {
-		tot += __builtin_popcountll(*a ^ *b);
+		tot += count(*a ^ *b);
 		a++;
 		b++;
 		len -= sizeof(*a);
@@ -147,11 +163,7 @@ xor_dist(uint8_t *a8, uint8_t *b8, size_t len)
 inline unsigned
 hash_dist(const char *trial, size_t len, uint8_t *hash, uint8_t trhash[1024/8])
 {
-	Skein1024_Ctxt_t c;
-
-	Skein1024_Init(&c, 1024);
-	Skein1024_Update(&c, (void*)trial, len);
-	Skein1024_Final(&c, trhash);
+	Hash(1024, (BitSequence *) trial, len * 8, (BitSequence *) trhash);
 	return xor_dist(trhash, hash, 1024/8);
 }
 
