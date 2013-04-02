@@ -167,9 +167,11 @@ make_hash_sexy_time(void *v)
 	uint8_t trhash[1024/8];
 	unsigned last_best = 4000;
 	
+	plock(&rlock);
 	for(int i = 0; i < LENGTH; i++) {
 		string[i] = rand() % 24 + ((rand() % 2) ? 65 : 97);
 	}
+	punlock(&rlock);
 
 	memcpy(loc_target_hash, target_bytes, sizeof(target_bytes));
 
