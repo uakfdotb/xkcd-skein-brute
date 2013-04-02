@@ -244,16 +244,26 @@ make_hash_sexy_time(void *v)
 int
 main(void)
 {
-	int r, len = 6;
+	int r, len = 120;
 	pthread_attr_t pdetached;
 	pthread_t thr;
 	bool overflow;
 	char initvalue[120];
-	srand(time(NULL));
+	
+	//seed the RNG
+	FILE *input = fopen("/dev/urandom", "rb");
+	unsigned int seed;
+	fread(&seed, sizeof(seed), 1, input);
+	fclose(input);
+	
+	srand(seed);
 	
 	for(int i = 0; i < 118; i++) {
 		initvalue[i] = rand() % 24 + ((rand() % 2) ? 65 : 97);
 	}
+	
+	initvalue[118] = 0;
+	initvalue[119] = 0;
 
 	read_hex(target, target_bytes);
 
