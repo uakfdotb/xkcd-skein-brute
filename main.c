@@ -244,7 +244,7 @@ make_hash_sexy_time(void *v)
 int
 main(void)
 {
-	int r, len = 120;
+	int r, len = 118;
 	pthread_attr_t pdetached;
 	pthread_t thr;
 	bool overflow;
